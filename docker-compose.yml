@@ -1,0 +1,28 @@
+# Docker Compose Definitions for local Developer Environment
+version: "2.1"
+services:
+  zookeeper:
+    image: wurstmeister/zookeeper
+    ports:
+      - "2181:2181"
+  kafka:
+    image: wurstmeister/kafka:0.10.1.0
+    environment:
+      KAFKA_ADVERTISED_HOST_NAME: localhost
+      KAFKA_ADVERTISED_PORT: 9092
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_CREATE_TOPICS: "GTR:1:1,RTG:1:1,RTM:1:1,MTR:1:1,MTG:1:1,GTM:1:1"
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
+    ports:
+      - "9092:9092"
+    expose:
+      - 9092
+  gateway:
+    build: ./gateway
+    volumes:
+      - ./gateway:/usr/src/app
+    ports:
+      - "5001:80"
+    depends_on:
+      - kafka
+      - zookeeper

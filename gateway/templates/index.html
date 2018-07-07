@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+
+	<head>
+		<script type="text/javascript" src="//code.jquery.com/jquery-1.4.2.min.js"></script>
+    	<script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/socket.io/1.3.5/socket.io.min.js"></script>
+
+    	<script type="text/javascript">
+    		$(document).ready(function() {
+	    		var socket = io.connect("http://localhost:5000");
+
+	    		$('form#buy').submit(function(event) {
+	    			console.log($('#bPrice').val());
+	    			console.log($('#bNumber').val());
+	                socket.emit('buy', {"Price": $('#bPrice').val(), "Amount": $('#bNumber').val(), "Type": "B", "User": "12345"});
+	                return false;
+	            });
+	    	});
+    	</script>
+	</head>
+	<body>
+
+	<h1>Coin Exchange</h1>
+	<h2>Hello User</h2>
+
+
+	<h3>Buy</h3>
+	<form id="buy" method="POST" action='#' onsubmit="return false">
+	At Price: <input type="number" step="0.01" name="bPrice"><br>
+	Number: <input type="number" name="bNumber"><br>
+	<input type="submit" value="Buy">
+	</form>
+
+	<h3>Sell</h3>
+	<form id="sell" method="POST" action='#'>
+	At Price: <input type="number" step="0.01" name="sPrice"><br>
+	Number: <input type="number" name="sNumber"><br>
+	<input type="submit" value="Sell">
+	</form>
+
+
+
+	</body>
+</html>
