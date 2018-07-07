@@ -19,10 +19,15 @@ services:
       - 9093
   tradesredis:
     image: redis:latest
+    ports:
+      - "6379:6379"
   usersredis:
     image: redis:latest
+    ports:
+      - "6378:6379"
   gateway:
     build: ./gateway
+    restart: always
     volumes:
       - ./gateway:/usr/src/app
     ports:

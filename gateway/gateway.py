@@ -2,6 +2,9 @@ from flask import Flask, render_template, request
 from flask_socketio import SocketIO, send, emit
 from pykafka import KafkaClient
 
+import uuid
+import json
+import redis
 import sys
 import logging
 import time
@@ -32,8 +35,11 @@ if len(client.topics) == 0:
     logger.info("No topics found, waiting for Kafka init")
     time.sleep(15)
 
-logger.debug(client.topics)
+logger.info(client.topics)
 riskPublishTopic = client.topics['GTR']
+
+logger.info("Connecting to Redis User Table...")
+userR = redis.StrictRedis(host='usersredis', port=6379, db=0)
 
 def acked(err, msg):
     if err is not None:
@@ -92,6 +98,25 @@ def sell(json):
                 logger.info('Successfully delivered msg {}'.format(msg.partition_key))
         except Queue.Empty:
             pass
+
+@socketio.on('newuser')
+def newuser(message):
+    user = uuid.uuid4()
+    emit('usercreated', str(user), room=request.sid)
+    user_properties = {"coins_owned": 100}
+    logger.info('Created user ' + str(user))
+    userR.set(str(user), str(json.dumps(user_properties)))
+    logger.info('User ' + str(user) + ' with data ' + str(userR.get(str(user))))
+
+@socketio.on('loginuser')
+def loginuser(message):
+    logger.info("Attempting login of user " + message)
+    if userR.get(message):
+        logger.info("Successful login of user " + message)
+        emit('loginsuccess', str(message), room=request.sid)
+    else:
+        logger.info("Failure to login user " + message)
+        emit('loginfail', "", room=request.sid)
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', debug=True, port=80)
