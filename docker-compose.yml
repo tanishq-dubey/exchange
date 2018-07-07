@@ -16,13 +16,21 @@ services:
     ports:
       - "9092:9092"
     expose:
-      - 9092
+      - 9093
+  tradesredis:
+    image: redis:latest
+  usersredis:
+    image: redis:latest
   gateway:
     build: ./gateway
     volumes:
       - ./gateway:/usr/src/app
     ports:
       - "5001:80"
+    environment:
+      - REDIS_HOST=usersredis
     depends_on:
       - kafka
       - zookeeper
+      - tradesredis
+      - usersredis
