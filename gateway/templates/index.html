@@ -14,7 +14,11 @@
                     console.log($('#bPrice').val());
                     console.log($('#bNumber').val());
                     if (userid != "") {
-                        socket.emit('buy', {"Price": $('#sPrice').val(), "Amount": $('#sNumber').val(), "Type": "B", "User": userid});
+                        if (($('#bPrice').val() == "") || ($('#bNumber').val() == "")) {
+                            alert("You have left a field blank");
+                            return false;
+                        }
+                        socket.emit('buy', {"Price": $('#bPrice').val(), "Amount": $('#bNumber').val(), "Type": "B", "User": userid});
                         $('#bPrice').val('')
                         $('#bNumber').val('')
                     }
@@ -26,6 +30,10 @@
                     console.log($('#sPrice').val());
                     console.log($('#sNumber').val());
                     if (userid != "") {
+                        if (($('#sPrice').val() == "") || ($('#sNumber').val() == "")) {
+                            alert("You have left a field blank");
+                            return false;
+                        }
                         socket.emit('sell', {"Price": $('#sPrice').val(), "Amount": $('#sNumber').val(), "Type": "S", "User": userid});
                         $('#bPrice').val('')
                         $('#bNumber').val('')
@@ -59,6 +67,10 @@
                     $('#usergreeter').text("Hello user " + data)
                     $('#login').hide()
                     $('#createUser').hide()
+                });
+
+                socker.on('tradeerror', function(data) {
+                    alert(data)
                 });
             });
         </script>

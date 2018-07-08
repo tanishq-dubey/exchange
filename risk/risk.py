@@ -33,12 +33,18 @@ for riskMsg in consumerRisk:
     if data["Type"] == "B":
         val = float(data["Amount"]) * float(data["Price"])
         if val > float(userData["cash"]):
-            producer.send('RTG', b'{"Type": "invalid"}')
+            logger.info("Buy order was invalid...(" + str(userData) + ")")
+            retData = {"Type": "Invalid", "sid": data["sid"]}
+            producer.send('RTG', json.dumps(retData))
         else:
+            logger.info("Buy order sent to matcher...")
             producer.send('RTM', riskMsg.value)
     else:
         val =  float(data["Amount"])
         if val > float(userData["coins_owned"]):
-            producer.send('RTG', b'{"Type": "invalid"}')
+            logger.info("Sell order was invalid...(" + str(userData) + ")")
+            retData = {"Type": "Invalid", "sid": data["sid"]}
+            producer.send('RTG', json.dumps(retData))
         else:
+            logger.info("Sell order sent to matcher...")
             producer.send('RTM', riskMsg.value)

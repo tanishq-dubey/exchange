@@ -3,11 +3,12 @@ from flask_socketio import SocketIO, send, emit
 from kafka import KafkaConsumer, KafkaProducer
 
 import uuid
-import json
+import json as jsn
 import redis
 import sys
 import logging
 import time
+import threading
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secretkey'
@@ -17,15 +18,27 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 logger.info("Starting gateway server...")
-attempts = 0
 
 logger.info("Waiting for Kafka init...")
 time.sleep(30)
 
 producer = KafkaProducer(bootstrap_servers='kafka:9092')
+consumerRisk = KafkaConsumer('RTG',
+                         group_id='RTGGroup',
+                         bootstrap_servers=['kafka:9092'])
 
 logger.info("Connecting to Redis User Table...")
 userR = redis.StrictRedis(host='usersredis', port=6379, db=0)
+
+def rtgListener():
+    for riskMsg in consumerRisk:
+        logger.info("Got message " + str(riskMsg.value) + " at offset " + str(riskMsg.offset))
+        data = jsn.loads(riskMsg.value)
+        emit('tradeerror', "Could not execute trade: " + str(data), room=data["sid"])
+
+logger.info("Start kafka listener")
+t1 = threading.Thread(target=rtgListener)
+t1.start()
 
 @app.route('/', methods = ['GET', 'POST'])
 def index():
@@ -51,24 +64,25 @@ Buy and sell work in the same way:
 def buy(json):
     json['sid'] = request.sid
     logger.info("Got Buy Order: " + str(json))
-    producer.send('GTR', str(json))
+    producer.send('GTR', jsn.dumps(json))
 
 
 # Put in a sell request
 @socketio.on('sell')
 def sell(json):
     json['sid'] = request.sid
-    logger.info("Got Sell Order: " + str(json))
-    producer.send('GTR', str(json))
+    logger.info("Got Sell Order: " + str(json) + " "  + str(type(json)))
+    producer.send('GTR', jsn.dumps(json))
 
 
+# User Management
 @socketio.on('newuser')
 def newuser(message):
     user = uuid.uuid4()
     emit('usercreated', str(user), room=request.sid)
     user_properties = {"coins_owned": 100, "cash": 1000}
     logger.info('Created user ' + str(user))
-    userR.set(str(user), str(json.dumps(user_properties)))
+    userR.set(str(user), str(jsn.dumps(user_properties)))
     logger.info('User ' + str(user) + ' with data ' + str(userR.get(str(user))))
 
 
@@ -82,5 +96,9 @@ def loginuser(message):
         logger.info("Failure to login user " + message)
         emit('loginfail', "", room=request.sid)
 
+
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', debug=True, port=80)
+
+
+
