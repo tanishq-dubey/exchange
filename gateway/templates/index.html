@@ -18,7 +18,7 @@
                         $('#bPrice').val('')
                         $('#bNumber').val('')
                     }
-                    
+
                     return false;
                 });
 
@@ -47,6 +47,7 @@
                     userid = data
                     $('#usergreeter').text("Hello user " + data)
                     $('#login').hide()
+                    $('#createUser').hide()
                 });
 
                 socket.on('loginfail', function(data) {
@@ -57,6 +58,7 @@
                     userid = data
                     $('#usergreeter').text("Hello user " + data)
                     $('#login').hide()
+                    $('#createUser').hide()
                 });
             });
         </script>

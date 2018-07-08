@@ -5,10 +5,12 @@ services:
     image: wurstmeister/zookeeper
     ports:
       - "2181:2181"
+    expose:
+      - 2181
   kafka:
     image: wurstmeister/kafka:0.10.1.0
     environment:
-      KAFKA_ADVERTISED_HOST_NAME: localhost
+      KAFKA_ADVERTISED_HOST_NAME: kafka
       KAFKA_ADVERTISED_PORT: 9092
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
       KAFKA_CREATE_TOPICS: "GTR:1:1,RTG:1:1,RTM:1:1,MTR:1:1,MTG:1:1,GTM:1:1"
@@ -39,3 +41,18 @@ services:
       - zookeeper
       - tradesredis
       - usersredis
+  risk:
+    build: ./risk
+    restart: always
+    volumes:
+      - ./risk:/usr/src/app
+    ports:
+      - "5002:80"
+    environment:
+      - REDIS_HOST=usersredis
+    depends_on:
+      - kafka
+      - zookeeper
+      - tradesredis
+      - usersredis
+      - gateway

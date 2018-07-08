@@ -5,7 +5,7 @@ itsdangerous==0.24
 Jinja2==2.10
 kazoo==2.5.0
 MarkupSafe==1.0
-pykafka==2.7.0
+kafka-python==1.4.3
 python-engineio==2.2.0
 python-socketio==2.0.0
 six==1.11.0

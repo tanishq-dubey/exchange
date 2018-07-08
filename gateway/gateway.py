@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, send, emit
-from pykafka import KafkaClient
+from kafka import KafkaConsumer, KafkaProducer
 
 import uuid
 import json
@@ -18,35 +18,14 @@ logger = logging.getLogger(__name__)
 
 logger.info("Starting gateway server...")
 attempts = 0
-while attempts < 30:
-    try:
-        client = KafkaClient(hosts="kafka:9092")
-        break
-    except Exception:
-        logger.info("Kafka not yet ready, waiting...")
-        time.sleep(3)
-        attempts = attempts + 1
 
-if attempts >= 30:
-    logger.error('Could not connect to Kafka', exc_info=True)
-    sys.exit(-1)
+logger.info("Waiting for Kafka init...")
+time.sleep(30)
 
-if len(client.topics) == 0:
-    logger.info("No topics found, waiting for Kafka init")
-    time.sleep(15)
-
-logger.info(client.topics)
-riskPublishTopic = client.topics['GTR']
+producer = KafkaProducer(bootstrap_servers='kafka:9092')
 
 logger.info("Connecting to Redis User Table...")
 userR = redis.StrictRedis(host='usersredis', port=6379, db=0)
-
-def acked(err, msg):
-    if err is not None:
-        logger.info("Failed to deliver message: {0}: {1}"
-              .format(msg.value(), err.str()))
-    else:
-        logger.info("Message produced: {0}".format(msg.value()))
 
 @app.route('/', methods = ['GET', 'POST'])
 def index():
@@ -72,41 +51,26 @@ Buy and sell work in the same way:
 def buy(json):
     json['sid'] = request.sid
     logger.info("Got Buy Order: " + str(json))
-    with riskPublishTopic.get_producer(delivery_reports=True) as producer:
-        producer.produce(str(json))
-        try:
-            msg, exc = producer.get_delivery_report(block=False)
-            if exc is not None:
-                logger.info('Failed to deliver msg {}: {}'.format(msg.partition_key, repr(exc)))
-            else:
-                logger.info('Successfully delivered msg {}'.format(msg.partition_key))
-        except Queue.Empty:
-            pass
+    producer.send('GTR', str(json))
+
 
 # Put in a sell request
 @socketio.on('sell')
 def sell(json):
     json['sid'] = request.sid
     logger.info("Got Sell Order: " + str(json))
-    with riskPublishTopic.get_producer(delivery_reports=True) as producer:
-        producer.produce(str(json))
-        try:
-            msg, exc = producer.get_delivery_report(block=False)
-            if exc is not None:
-                logger.info('Failed to deliver msg {}: {}'.format(msg.partition_key, repr(exc)))
-            else:
-                logger.info('Successfully delivered msg {}'.format(msg.partition_key))
-        except Queue.Empty:
-            pass
+    producer.send('GTR', str(json))
+
 
 @socketio.on('newuser')
 def newuser(message):
     user = uuid.uuid4()
     emit('usercreated', str(user), room=request.sid)
-    user_properties = {"coins_owned": 100}
+    user_properties = {"coins_owned": 100, "cash": 1000}
     logger.info('Created user ' + str(user))
     userR.set(str(user), str(json.dumps(user_properties)))
     logger.info('User ' + str(user) + ' with data ' + str(userR.get(str(user))))
+
 
 @socketio.on('loginuser')
 def loginuser(message):
