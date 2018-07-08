@@ -12,7 +12,7 @@ import threading
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secretkey'
-socketio = SocketIO(app)
+socketio = SocketIO(app, async_mode="threading")
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -30,15 +30,17 @@ consumerRisk = KafkaConsumer('RTG',
 logger.info("Connecting to Redis User Table...")
 userR = redis.StrictRedis(host='usersredis', port=6379, db=0)
 
-def rtgListener():
-    for riskMsg in consumerRisk:
-        logger.info("Got message " + str(riskMsg.value) + " at offset " + str(riskMsg.offset))
-        data = jsn.loads(riskMsg.value)
-        emit('tradeerror', "Could not execute trade: " + str(data), room=data["sid"])
 
-logger.info("Start kafka listener")
-t1 = threading.Thread(target=rtgListener)
-t1.start()
+@app.before_first_request
+def activate_job():
+    def rtgListener():
+        with app.test_request_context():
+            for riskMsg in consumerRisk:
+                logger.info("Got message " + str(riskMsg.value) + " at offset " + str(riskMsg.offset))
+                data = jsn.loads(riskMsg.value)
+                socketio.emit('tradeerror', "Could not execute trade: " + str(data), room=data["sid"])
+    thread = threading.Thread(target=rtgListener)
+    thread.start()
 
 @app.route('/', methods = ['GET', 'POST'])
 def index():
@@ -80,7 +82,8 @@ def sell(json):
 def newuser(message):
     user = uuid.uuid4()
     emit('usercreated', str(user), room=request.sid)
-    user_properties = {"coins_owned": 100, "cash": 1000}
+    # Potentail values describe values before trade has been completed 
+    user_properties = {"actual_coins_owned": 100, "actual_cash": 1000, "potential_coins_owned": 100, "potential_cash": 1000}
     logger.info('Created user ' + str(user))
     userR.set(str(user), str(jsn.dumps(user_properties)))
     logger.info('User ' + str(user) + ' with data ' + str(userR.get(str(user))))

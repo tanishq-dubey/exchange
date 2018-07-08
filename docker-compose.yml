@@ -56,3 +56,19 @@ services:
       - tradesredis
       - usersredis
       - gateway
+  match:
+    build: ./match
+    restart: always
+    volumes:
+      - ./match:/usr/src/app
+    ports:
+      - "5003:80"
+    environment:
+      - REDIS_HOST=tradesredis
+    depends_on:
+      - kafka
+      - zookeeper
+      - tradesredis
+      - usersredis
+      - gateway
+      - risk
