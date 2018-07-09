@@ -17,7 +17,18 @@ docker-compose up -d
 ```
 to run the entire system as a daemon (no log output to STDOUT)
 
+Please wait around 1 minute for the website to be active (how long it takes Kafka to init)
 Then visit `localhost:5001` and enjoy!
+
+### Scaling
+
+You can also scale the 3 main services or the Kafka service as needed by doing a
+```
+docker-compose scale kafka 4
+```
+And replacing kafka and 4 with your service name and count. 
+
+This allows for failover protection and high performance load balancing. If scaling the Kafka group, you can also specify topic partitions and replicas in the `docker-compose.yml`
 
 ## Usage
  1. Either login with an existing UserID or press "Create new user"
