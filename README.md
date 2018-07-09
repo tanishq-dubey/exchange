@@ -34,3 +34,10 @@ We have 3 services, `gateway`, `risk` and `match`.
 In addition there are 4 more services that run:
  - Kafka and ZooKeeper -> Used for the message bus between our three core services.
  - Redis (2 databases) -> We have a database for both the user data (how much money/coins they have) and the trades that are currently being conducted.
+ 
+## ToDo
+ 
+This is far from fully featured:
+ - [ ] Average Buy/Sell Price graph
+ - [ ] Reload trade data on login
+ - [ ] Reload order book on login
