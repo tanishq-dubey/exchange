@@ -26,6 +26,9 @@ producer = KafkaProducer(bootstrap_servers='kafka:9092')
 consumerRisk = KafkaConsumer('RTG',
                          group_id='RTGGroup',
                          bootstrap_servers=['kafka:9092'])
+consumerMatch = KafkaConsumer('MTG',
+                         group_id='MTGGroup',
+                         bootstrap_servers=['kafka:9092'])
 
 logger.info("Connecting to Redis User Table...")
 userR = redis.StrictRedis(host='usersredis', port=6379, db=0)
@@ -35,12 +38,30 @@ userR = redis.StrictRedis(host='usersredis', port=6379, db=0)
 def activate_job():
     def rtgListener():
         with app.test_request_context():
-            for riskMsg in consumerRisk:
-                logger.info("Got message " + str(riskMsg.value) + " at offset " + str(riskMsg.offset))
-                data = jsn.loads(riskMsg.value)
-                socketio.emit('tradeerror', "Could not execute trade: " + str(data), room=data["sid"])
+            while True:
+                for riskMsg in consumerRisk:
+                    logger.info("Got risk message " + str(riskMsg.value) + " at offset " + str(riskMsg.offset))
+                    data = jsn.loads(riskMsg.value)
+                    socketio.emit('tradeerror', "Could not execute trade: " + str(data), room=data["SID"])
+    def mtgListener():
+        with app.test_request_context():
+            while True:
+                for matchMsg in consumerMatch:
+                    logger.info("Got match message " + str(matchMsg.value) + " at offset " + str(matchMsg.offset))
+                    matchData = jsn.loads(matchMsg.value)
+                    if matchData["Type"] == "NewTrade":
+                        socketio.emit("NewTrade", matchMsg.value, broadcast=True)
+                    elif matchData["Type"] == "TradeComplete":
+                        dSend = {"TradeID": matchData["TradeID"],
+                        "actual_cash": matchData["actual_cash"], "potential_cash": matchData["potential_cash"], "actual_coins_owned": matchData["actual_coins_owned"], "potential_coins_owned": matchData["potential_coins_owned"]}
+                        socketio.emit("TradeComplete", str(jsn.dumps(dSend)), room=matchData["SID"])
+                    elif matchData["Type"] == "NewTradePrivate":
+                        socketio.emit("NewTradePrivate", matchMsg.value, room=matchData["SID"])
+
     thread = threading.Thread(target=rtgListener)
     thread.start()
+    threadMTG = threading.Thread(target=mtgListener)
+    threadMTG.start()
 
 @app.route('/', methods = ['GET', 'POST'])
 def index():
@@ -64,7 +85,8 @@ Buy and sell work in the same way:
 """
 @socketio.on('buy')
 def buy(json):
-    json['sid'] = request.sid
+    json['SID'] = request.sid
+    json['TradeID'] = str(uuid.uuid4())
     logger.info("Got Buy Order: " + str(json))
     producer.send('GTR', jsn.dumps(json))
 
@@ -72,7 +94,8 @@ def buy(json):
 # Put in a sell request
 @socketio.on('sell')
 def sell(json):
-    json['sid'] = request.sid
+    json['SID'] = request.sid
+    json['TradeID'] = str(uuid.uuid4())
     logger.info("Got Sell Order: " + str(json) + " "  + str(type(json)))
     producer.send('GTR', jsn.dumps(json))
 
@@ -81,20 +104,26 @@ def sell(json):
 @socketio.on('newuser')
 def newuser(message):
     user = uuid.uuid4()
-    emit('usercreated', str(user), room=request.sid)
-    # Potentail values describe values before trade has been completed 
-    user_properties = {"actual_coins_owned": 100, "actual_cash": 1000, "potential_coins_owned": 100, "potential_cash": 1000}
+    # Potental values describe values before trade has been completed
+    user_properties = {"actual_coins_owned": 100, "actual_cash": 1000, "potential_coins_owned": 100, "potential_cash": 1000, "SID": request.sid}
     logger.info('Created user ' + str(user))
     userR.set(str(user), str(jsn.dumps(user_properties)))
-    logger.info('User ' + str(user) + ' with data ' + str(userR.get(str(user))))
+    user_properties["user"] = str(user)
+    logger.info('User ' + str(user) + ' with data ' + str(user_properties))
+    emit('usercreated', str(jsn.dumps(user_properties)), room=request.sid)
 
 
 @socketio.on('loginuser')
 def loginuser(message):
     logger.info("Attempting login of user " + message)
-    if userR.get(message):
+    user = userR.get(message)
+    if user:
         logger.info("Successful login of user " + message)
-        emit('loginsuccess', str(message), room=request.sid)
+        user = jsn.loads(user)
+        user["SID"] = request.sid
+        userR.set(message, jsn.dumps(user))
+        user['user'] = message
+        emit('loginsuccess', str(jsn.dumps(user)), room=request.sid)
     else:
         logger.info("Failure to login user " + message)
         emit('loginfail', "", room=request.sid)
@@ -102,6 +131,3 @@ def loginuser(message):
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', debug=True, port=80)
-
-
-

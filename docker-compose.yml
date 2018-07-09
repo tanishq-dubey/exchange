@@ -1,4 +1,3 @@
-# Docker Compose Definitions for local Developer Environment
 version: "2.1"
 services:
   zookeeper:

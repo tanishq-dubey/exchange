@@ -5,8 +5,15 @@
         <script type="text/javascript" src="//code.jquery.com/jquery-1.4.2.min.js"></script>
         <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/socket.io/1.3.5/socket.io.min.js"></script>
 
+        <!-- Compiled and minified CSS -->
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0-rc.2/css/materialize.min.css">
+
+        <!-- Compiled and minified JavaScript -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0-rc.2/js/materialize.min.js"></script>
+
         <script type="text/javascript">
             $(document).ready(function() {
+                M.AutoInit();
                 var socket = io.connect("http://localhost:5001");
                 var userid = "";
 
@@ -21,6 +28,8 @@
                         socket.emit('buy', {"Price": $('#bPrice').val(), "Amount": $('#bNumber').val(), "Type": "B", "User": userid});
                         $('#bPrice').val('')
                         $('#bNumber').val('')
+                    } else {
+                        alert("You are not logged in")
                     }
 
                     return false;
@@ -35,8 +44,10 @@
                             return false;
                         }
                         socket.emit('sell', {"Price": $('#sPrice').val(), "Amount": $('#sNumber').val(), "Type": "S", "User": userid});
-                        $('#bPrice').val('')
-                        $('#bNumber').val('')
+                        $('#sPrice').val('')
+                        $('#sNumber').val('')
+                    } else {
+                        alert("You are not logged in")
                     }
                     return false;
                 });
@@ -52,10 +63,15 @@
                 });
 
                 socket.on('loginsuccess', function(data) {
-                    userid = data
-                    $('#usergreeter').text("Hello user " + data)
+                    var userData = JSON.parse(data);
+                    $('#usergreeter').text("Hello user " + userData.user)
                     $('#login').hide()
                     $('#createUser').hide()
+                    $('#coinsowned').text(userData.actual_coins_owned)
+                    $('#cash').text(userData.actual_cash)
+                    $('#coinsowned_potential').text(userData.potential_coins_owned)
+                    $('#cash_potential').text(userData.potential_cash)
+                    userid = userData.user
                 });
 
                 socket.on('loginfail', function(data) {
@@ -63,50 +79,146 @@
                 });
 
                 socket.on('usercreated', function(data) {
-                    userid = data
-                    $('#usergreeter').text("Hello user " + data)
+                    var userData = JSON.parse(data);
+                    $('#usergreeter').text("Hello user " + userData.user)
                     $('#login').hide()
                     $('#createUser').hide()
+                    $('#coinsowned').text(userData.actual_coins_owned)
+                    $('#cash').text(userData.actual_cash)
+                    $('#coinsowned_potential').text(userData.potential_coins_owned)
+                    $('#cash_potential').text(userData.potential_cash)
+                    userid = userData.user
                 });
 
                 socket.on('tradeerror', function(data) {
                     alert(data)
                 });
+
+                socket.on('NewTrade', function(data) {
+                    var tradeData = JSON.parse(data);
+                    if (tradeData.TradeType == "B") {
+                        $('#outstandingTradesTableBuy').append('<tr><td>' + tradeData.Amount + ' Coins</td><td>$' + tradeData.Price + '</td></tr>');
+                    } else {
+                        $('#outstandingTradesTableSell').append('<tr><td>' + tradeData.Amount + ' Coins</td><td>$' + tradeData.Price + '</td></tr>');
+                    }
+                });
+
+                socket.on('NewTradePrivate', function(data) {
+                    var tradeData = JSON.parse(data);
+                        $('#tradesTable').append('<tr id="' + tradeData.TradeID + '"><td>' + tradeData.TradeType + '</td><td>' + tradeData.Amount + ' Coins</td><td>$' + tradeData.Price + '</td><td>' + tradeData.TradeID + '</td></tr>');
+                });
+
+                socket.on('TradeComplete', function(data) {
+                    var tradeData = JSON.parse(data);
+                    $('#' + tradeData.TradeID).remove();
+                    $('#coinsowned').text(tradeData.actual_coins_owned)
+                    $('#cash').text(tradeData.actual_cash)
+                    $('#coinsowned_potential').text(tradeData.potential_coins_owned)
+                    $('#cash_potential').text(tradeData.potential_cash)
+                    M.toast({html: 'Your trade of ID ' + tradeData.TradeID + ' has been completed!'})
+                });
             });
         </script>
     </head>
     <body>
+        <nav>
+            <div class="nav-wrapper green darken-3">
+                <a href="#" class="brand-logo">Coin Exchange</a>
+                <div id="nav-mobile" class="right hide-on-med-and-down">
+                    <span>
+                    <h5 id="usergreeter" style="float: left; margin-right: 20px"></h5>
+                    <form id="login" method="POST" action='#' onsubmit="return false" style="float: left; margin-right: 20px">
+                        <div class="input-field white-text" style="float: left; margin-right: 10px">
+                            <input id="loginUser" type="text" class="white-text">
+                            <label for="loginUser" class="white-text">Login User ID</label>
+                        </div>
+                        <button class="btn waves-effect waves-light blue-grey lighten-5 black-text" type="submit" name="action">Login
+                        </button>
+                    </form>
+                    <form id="createUser" method="POST" action='#' onsubmit="return false" style="float: left; margin-right: 20px">
+                        <button class="btn waves-effect waves-light blue-grey lighten-5 black-text" type="submit" name="action">Create User
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </nav>
 
-    <h1>Coin Exchange</h1>
+        <div class="row">
+            <div class="col l12 s12">
+                <div class="card green darken-1">
+                    <div class="card-content white-text">
+                        <span class="card-title">Current Account Value</span>
+                        Coins owned: <span id="coinsowned">0</span><br>
+                        Cash: <span id="cash">0</span><br>
+                        Coins in orders: <span id="coinsowned_potential">0</span><br>
+                        Cash in orders: <span id="cash_potential">0</span><br>
+                    </div>
+                    <div class="card-action">
+                    </div>
+                </div>
+            </div>
+        </div>
 
-    <div id="loginarea" style="border-style: solid; padding: 10px 10px 10px 10px;">
-        <h2 id="usergreeter">You are not logged in</h2>
-        <form id="login" method="POST" action='#' onsubmit="return false">
-            User ID: <input type="text" step="0.01" id="loginUser"><br>
-            <input type="submit" value="Login">
-        </form>
-        <br>
-        <form id="createUser" method="POST" action='#' onsubmit="return false">
-            Create a new user: <input type="submit" value="Create User">
-        </form>
-    </div>
+        <div class="row">
+            <div class="col l8 s12">
+                <h3>Trades</h3>
+                <div style="height: 400px; overflow-y: scroll;">
+                    <table class="responsive-table highlight" id="tradesTable">
+                    </table>
+                </div>
+            </div>
+            <div id="orders" class="col l4 s12">
+                <h5>Buy</h5><br>
+                <form id="buy" method="POST" action='#' onsubmit="return false">
+                    <div class="input-field">
+                        <input id="bPrice" type="text">
+                        <label for="bPrice">Price to buy at</label>
+                    </div>
+                    <div class="input-field">
+                        <input id="bNumber" type="text">
+                        <label for="bNumber">Number of coins to buy</label>
+                    </div>
+                    <button class="btn waves-effect waves-light light-green darken-4" type="submit" name="action">Buy
+                    </button>
+                </form>
+
+                <h5>Sell</h5><br>
+                <form id="sell" method="POST" action='#' onsubmit="return false">
+                    <div class="input-field">
+                        <input id="sPrice" type="text">
+                        <label for="sPrice">Price to buy at</label>
+                    </div>
+                    <div class="input-field">
+                        <input id="sNumber" type="text">
+                        <label for="sNumber">Number of coins to buy</label>
+                    </div>
+                    <button class="btn waves-effect waves-light light-green darken-4" type="submit" name="action">Sell
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col l6">
+                <h5>Order Book (Buy)</h5>
+                <div style="height: 400px; overflow-y: scroll;">
+                    <table style="width:100%" id="outstandingTradesTableBuy">
+                    </table>
+                </div>
+            </div>
+            <div class="col l6">
+                <h5>Order Book (Sell)</h5>
+                <div style="height: 400px; overflow-y: scroll;">
+                    <table style="width:100%" id="outstandingTradesTableSell">
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    
 
 
-    <div id="orders" style="border-style: solid; padding: 10px 10px 10px 10px;">
-        <h3>Buy</h3>
-        <form id="buy" method="POST" action='#' onsubmit="return false">
-        At Price: <input type="text" step="0.01" id="bPrice"><br>
-        Number: <input type="text" id="bNumber"><br>
-        <input type="submit" value="Buy" id="buysubmit">
-        </form>
-
-        <h3>Sell</h3>
-        <form id="sell" method="POST" action='#'>
-        At Price: <input type="text" step="0.01" id="sPrice"><br>
-        Number: <input type="text" id="sNumber"><br>
-        <input type="submit" value="Sell" id="sellsubmit">
-        </form>
-    </div>
+    
 
     <div>
 
